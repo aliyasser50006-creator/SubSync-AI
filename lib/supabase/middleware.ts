@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function updateSession(request: NextRequest) {
+  const requestHeaders = new Headers(request.headers);
   let response = NextResponse.next({
     request: {
-      headers: request.headers,
+      headers: requestHeaders,
     },
   });
 
@@ -73,7 +74,7 @@ export async function updateSession(request: NextRequest) {
         request.cookies.set(cookieName, newCookieValue);
         response = NextResponse.next({
           request: {
-            headers: request.headers,
+            headers: requestHeaders,
           },
         });
         
