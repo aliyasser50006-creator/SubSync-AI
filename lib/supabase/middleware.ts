@@ -1,83 +1,52 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function updateSession(request: NextRequest) {
-  const requestHeaders = new Headers(request.headers);
-  let response = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  });
-
-  // Find the Supabase auth cookie (usually named sb-[project_ref]-auth-token)
-  const cookieName = request.cookies.getAll().find(c => c.name.includes('-auth-token'))?.name;
-  
-  if (!cookieName) {
-    return response;
-  }
-
-  const authCookie = request.cookies.get(cookieName)?.value;
-  if (!authCookie) {
-    return response;
-  }
+  // Return early without mutating any request headers to avoid V8 panics in Edge
+  let response = NextResponse.next();
 
   try {
+    const cookieName = request.cookies.getAll().find(c => c.name.includes('-auth-token'))?.name;
+    if (!cookieName) return response;
+
+    const authCookie = request.cookies.get(cookieName)?.value;
+    if (!authCookie) return response;
+
     let tokenData;
-    
-    // Handle both plain JSON and array-wrapped cookie formats
     try {
       tokenData = JSON.parse(authCookie);
       if (Array.isArray(tokenData)) {
-        // Handle chunk-encoded format: [access_token, refresh_token, ...]
-        tokenData = {
-          access_token: tokenData[0],
-          refresh_token: tokenData[1],
-        };
+        tokenData = { access_token: tokenData[0], refresh_token: tokenData[1] };
       }
     } catch (e) {
-      // If parsing fails, skip refresh
       return response;
     }
-    
-    // Only attempt refresh if we have a refresh_token
-    if (tokenData && tokenData.refresh_token && tokenData.access_token) {
+
+    if (tokenData?.refresh_token && tokenData?.access_token) {
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      
       if (!supabaseUrl || !anonKey) return response;
 
       const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': anonKey,
-          'Authorization': `Bearer ${tokenData.access_token}`
-        },
+        headers: { 'Content-Type': 'application/json', apikey: anonKey, Authorization: `Bearer ${tokenData.access_token}` },
         body: JSON.stringify({ refresh_token: tokenData.refresh_token }),
       });
 
       if (res.ok) {
         const data = await res.json();
         
-        // Reconstruct cookie value depending on the original format
         let newCookieValue;
-        if (Array.isArray(JSON.parse(authCookie))) {
-           newCookieValue = JSON.stringify([data.access_token, data.refresh_token, '', '', '']);
-        } else {
-           newCookieValue = JSON.stringify({
-             access_token: data.access_token,
-             refresh_token: data.refresh_token,
-             user: data.user
-           });
+        // Reconstruct correctly safely
+        try {
+          if (Array.isArray(JSON.parse(authCookie))) {
+             newCookieValue = JSON.stringify([data.access_token, data.refresh_token, '', '', '']);
+          } else {
+             newCookieValue = JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user });
+          }
+        } catch (err) {
+           newCookieValue = JSON.stringify({ access_token: data.access_token, refresh_token: data.refresh_token });
         }
-        
-        // Update the request and response cookies
-        request.cookies.set(cookieName, newCookieValue);
-        response = NextResponse.next({
-          request: {
-            headers: requestHeaders,
-          },
-        });
-        
+
         response.cookies.set(cookieName, newCookieValue, {
           path: '/',
           httpOnly: true,
@@ -87,7 +56,7 @@ export async function updateSession(request: NextRequest) {
       }
     }
   } catch (error) {
-    console.error('Manual session refresh failed:', error);
+    console.error('Middleware fetch refresh failed:', error);
   }
 
   return response;
