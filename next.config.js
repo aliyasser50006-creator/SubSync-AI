@@ -5,6 +5,10 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
 
+  experimental: {
+    serverComponentsExternalPackages: ['@supabase/ssr', '@supabase/supabase-js'],
+  },
+
   eslint: {
     ignoreDuringBuilds: true,
   },
