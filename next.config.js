@@ -4,7 +4,7 @@ const nextConfig = {
   swcMinify: true,
   compress: true,
   poweredByHeader: false,
-  serverExternalPackages: ['@supabase/ssr', '@supabase/supabase-js'],
+
   eslint: {
     ignoreDuringBuilds: true,
   },
