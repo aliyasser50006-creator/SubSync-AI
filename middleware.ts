@@ -1,19 +1,21 @@
+import { NextResponse } from 'next/server';
 
-
-import { type NextRequest, NextResponse } from 'next/server';
-import { updateSession } from './lib/supabase/middleware';
-
-export async function middleware(request: NextRequest) {
+export function middleware() {
   try {
-    return await updateSession(request);
-  } catch (err) {
-    console.error('Middleware crash caught:', err);
-    return NextResponse.next();
+    return NextResponse.json({
+      status: 'middleware-ok',
+      timestamp: Date.now(),
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: String(error),
+      },
+      { status: 500 }
+    );
   }
 }
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/'],
 };
