@@ -113,7 +113,7 @@ export function SourceVideoCard({
             <Input
               id="imgUrl"
               type="url"
-              placeholder="https://example.com/poster.jpg"
+              placeholder="https://example.com/poster.png (.webp, .jpg, etc.)"
               value={imgUrl}
               onChange={(e) => onImgUrlChange?.(e.target.value)}
               aria-invalid={!!imgUrlError}
@@ -135,7 +135,7 @@ export function SourceVideoCard({
             </p>
           ) : (
             <p className="text-xs text-muted-foreground/80 leading-normal">
-              Optional custom thumbnail or movie poster image URL.
+              Optional custom thumbnail or movie poster image URL (.png, .webp, .jpg, .avif, .gif, etc.).
             </p>
           )}
         </div>
