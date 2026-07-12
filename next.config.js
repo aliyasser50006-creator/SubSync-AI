@@ -14,18 +14,15 @@ const nextConfig = {
   },
   images: {
     formats: ['image/avif', 'image/webp'],
+    dangerouslyAllowSVG: true,
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'i.ytimg.com',
+        hostname: '**',
       },
       {
-        protocol: 'https',
-        hostname: 'img.youtube.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.psmcdn.net',
+        protocol: 'http',
+        hostname: '**',
       },
     ],
   },
