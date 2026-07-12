@@ -304,11 +304,11 @@ export function validateImageUrl(url: string): { valid: boolean; error?: string 
   if (!url || !url.trim()) return { valid: true };
   try {
     const parsed = new URL(url.trim());
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      return { valid: false, error: 'Image URL must use http or https protocol.' };
+    if (!['http:', 'https:', 'data:'].includes(parsed.protocol)) {
+      return { valid: false, error: 'Image URL must use http, https, or data protocol.' };
     }
     return { valid: true };
   } catch {
-    return { valid: false, error: 'Please enter a valid image URL.' };
+    return { valid: false, error: 'Please enter a valid image URL (.png, .webp, .jpg, etc.).' };
   }
 }
