@@ -72,6 +72,10 @@ export const VideoThumbnail = memo(function VideoThumbnail({
           fill
           sizes="(max-width: 640px) 96px, 148px"
           loading="lazy"
+          unoptimized={
+            imageSrc.startsWith('data:') ||
+            /\.(svg|gif)$/i.test(imageSrc)
+          }
           className="object-cover"
           onError={() => {
             if (imgUrl?.trim() && imageSrc === imgUrl?.trim()) {
