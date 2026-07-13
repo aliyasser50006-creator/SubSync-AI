@@ -459,6 +459,7 @@ export function VideosPage() {
                   <VideoPlayer
                     key={`videos-page-player-${selectedVideo.id}-${selectedVideo.video_url}`}
                     src={selectedVideo.video_url}
+                    posterUrl={selectedVideo.img_url}
                     playRequestId={playRequestId}
                     subtitleUrl={subtitlesEnabled ? selectedSubtitleUrl : null}
                     subtitleDelaySeconds={subtitleDelaySeconds}
