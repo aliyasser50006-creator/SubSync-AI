@@ -104,6 +104,7 @@ export function VideoPlaybackCard({
               <VideoPlayer
                 key={`my-videos-player-${selectedJob.id}-${selectedJob.video_url}`}
                 src={playerUrl}
+                posterUrl={selectedJob.img_url}
                 playRequestId={playRequestId}
                 subtitleUrl={selectedSubtitleUrl}
                 subtitleSettings={selectedJob.subtitle_settings || DEFAULT_SUBTITLE_SETTINGS}
