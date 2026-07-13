@@ -99,6 +99,7 @@ export function LivePreviewCard({
                 <div className="rounded-xl overflow-hidden shadow-panel border border-border/40">
                   <VideoPlayer
                     src={currentJob.video_url}
+                    posterUrl={currentJob.img_url}
                     subtitleUrl={subtitlePlaybackUrl}
                     subtitleSettings={settings}
                   />
