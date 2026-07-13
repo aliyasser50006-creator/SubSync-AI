@@ -756,6 +756,7 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
               <div className="flex-1 min-h-[200px] lg:min-h-0">
                 <VideoPlayer
                   src={job.video_url}
+                  posterUrl={job.img_url}
                   subtitleUrl={subtitlePreviewUrl}
                   subtitleSettings={job.subtitle_settings}
                   className="h-full w-full"
