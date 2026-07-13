@@ -126,6 +126,7 @@ export function VideoDetailPage({ job, returnTo }: VideoDetailPageProps) {
             <VideoPlayerSection
               videoId={job.id}
               videoUrl={job.video_url}
+              posterUrl={job.img_url}
               subtitleUrl={subtitleUrl}
               subtitleSettings={activeSettings}
               subtitleDelaySeconds={subtitleDelaySeconds}
