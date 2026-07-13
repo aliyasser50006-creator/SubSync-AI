@@ -23,6 +23,7 @@ const VideoPlayer = dynamic(() => import('@/components/VideoPlayer'), {
 interface VideoPlayerSectionProps {
   videoId: string;
   videoUrl: string;
+  posterUrl?: string | null;
   subtitleUrl: string | null;
   subtitleSettings: SubtitleSettings;
   subtitleDelaySeconds: number;
@@ -32,6 +33,7 @@ interface VideoPlayerSectionProps {
 export function VideoPlayerSection({
   videoId,
   videoUrl,
+  posterUrl,
   subtitleUrl,
   subtitleSettings,
   subtitleDelaySeconds,
@@ -82,6 +84,7 @@ export function VideoPlayerSection({
         <VideoPlayer
           key={`video-detail-${videoId}`}
           src={videoUrl}
+          posterUrl={posterUrl}
           playRequestId={playRequestId}
           subtitleUrl={subtitlesEnabled ? subtitleUrl : null}
           subtitleDelaySeconds={subtitleDelaySeconds}
