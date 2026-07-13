@@ -21,6 +21,7 @@ import { SubtitleSettings } from '@/lib/types/database';
 
 interface VideoPlayerProps {
   src: string;
+  posterUrl?: string | null;
   subtitleUrl?: string | null;
   subtitleSettings?: SubtitleSettings;
   subtitleDelaySeconds?: number;
@@ -131,12 +132,14 @@ function findActiveCue(
 
 export default function VideoPlayer({
   src,
+  posterUrl = null,
   subtitleUrl = null,
   subtitleSettings = {},
   subtitleDelaySeconds = 0,
   className = '',
   playRequestId,
 }: VideoPlayerProps) {
+  const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -361,6 +364,7 @@ export default function VideoPlayer({
     setVideoError(null);
     setReady(false);
     setPlaying(false);
+    setHasStartedPlaying(false);
     currentTimeRef.current = 0;
     durationRef.current = 0;
     activeCueIdRef.current = null;
@@ -407,8 +411,15 @@ export default function VideoPlayer({
     };
   }, [hasSource, ReactPlayer, ready, videoError, playerKey]);
 
+  const prevPlayRequestIdRef = useRef(playRequestId);
+
   useEffect(() => {
     if (playRequestId === undefined || !hasSource || videoError) return;
+
+    // Only auto-play when playRequestId changes after mount (user explicitly requested play),
+    // not on initial render.
+    if (prevPlayRequestIdRef.current === playRequestId) return;
+    prevPlayRequestIdRef.current = playRequestId;
 
     setPlaying(true);
   }, [playRequestId, hasSource, videoError]);
@@ -605,6 +616,18 @@ export default function VideoPlayer({
       onMouseLeave={() => playing && setShowControls(false)}
       tabIndex={0}
     >
+      {/* Poster image – visible until user starts playback */}
+      {posterUrl && !hasStartedPlaying && !videoError && (
+        <div className="video-player-poster">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={posterUrl}
+            alt="Video poster"
+            className="video-player-poster-img"
+          />
+        </div>
+      )}
+
       <div className="video-player-video" onClick={togglePlay}>
         {!videoError && hasSource && ReactPlayer && (
           <ReactPlayer
@@ -654,9 +677,11 @@ export default function VideoPlayer({
             onPlay={() => {
               setPlaying(true);
               setBuffering(false);
+              setHasStartedPlaying(true);
             }}
             onPlaying={() => {
               setBuffering(false);
+              setHasStartedPlaying(true);
             }}
             onPause={() => setPlaying(false)}
             onWaiting={() => {
@@ -671,16 +696,21 @@ export default function VideoPlayer({
             }}
             config={{
               youtube: {
-                modestbranding: 1,
-                rel: 0,
-                controls: 0,
+                playerVars: {
+                  modestbranding: 1,
+                  rel: 0,
+                  controls: 0,
+                  autoplay: 0,
+                },
               },
               vimeo: {
                 controls: false,
+                autoplay: false,
               },
-              html: {
+              file: {
                 attributes: {
                   controlsList: 'nodownload',
+                  autoPlay: false,
                 },
               },
             } as any}
