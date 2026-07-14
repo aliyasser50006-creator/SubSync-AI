@@ -130,12 +130,12 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     scroll-behavior: smooth;
-    overflow-x: hidden;
+    overflow: hidden;
   }
 
   body {
     @apply min-h-screen bg-background text-foreground antialiased;
-    overflow-x: hidden;
+    overflow: hidden;
     overscroll-behavior-y: none;
   }
 
