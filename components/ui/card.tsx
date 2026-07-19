@@ -8,13 +8,12 @@ const cardVariants = cva(
   {
     variants: {
       variant: {
-        default:
-          'border border-border/70 bg-card/85 shadow-soft backdrop-blur-xl',
-        surface: 'border border-border bg-card shadow-sm',
+        default: 'border border-border bg-card shadow-sm',
+        surface: 'border border-border bg-card shadow-xs',
         glass:
-          'border border-border/50 bg-card/70 shadow-soft backdrop-blur-xl',
-        elevated: 'border border-border bg-card shadow-panel',
-        subtle: 'border border-border/60 bg-muted/30 shadow-none',
+          'border border-border/50 bg-card/70 shadow-sm backdrop-blur-xl',
+        elevated: 'border border-border bg-card shadow-md',
+        subtle: 'border border-border/50 bg-muted/50 shadow-none',
       },
     },
     defaultVariants: {
