@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient, type QueryFunctionContext } from '@tanstack/react-query';
 import { CheckCircle2, Loader2, Search, VideoOff } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
 import { Job } from '@/lib/types/database';
 import { validateImageUrl, validateVideoUrl } from '@/lib/utils/subtitle-converter';
+import { escapeIlike } from '@/lib/utils/escape-ilike';
 
 import { VideoFilters, AvailabilityFilter } from './video-filters';
 import { VideoListItem } from './video-list-item';
@@ -33,6 +34,10 @@ interface MyVideosClientProps {
 export function MyVideosClient({ initialAvailableCount, initialUnavailableCount }: MyVideosClientProps) {
   const supabase = useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
+
+  // Cache the resolved user ID so auth.getUser() is not called on every
+  // paginated fetch — eliminates a redundant network round-trip per page.
+  const cachedUserIdRef = useRef<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -63,17 +68,23 @@ export function MyVideosClient({ initialAvailableCount, initialUnavailableCount 
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  const fetchJobs = async ({ pageParam = 0 }) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Unauthorized");
+  const fetchJobs = async ({ pageParam, signal }: QueryFunctionContext<string[], number>) => {
+    // Use cached user ID to avoid a round-trip on every page fetch.
+    if (!cachedUserIdRef.current) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Unauthorized');
+      cachedUserIdRef.current = user.id;
+    }
+    const userId = cachedUserIdRef.current;
+    const page = pageParam ?? 0;
 
-    const from = pageParam * ITEMS_PER_PAGE;
+    const from = page * ITEMS_PER_PAGE;
     const to = from + ITEMS_PER_PAGE - 1;
 
     let query = supabase
       .from('jobs')
       .select('*', { count: 'exact' })
-      .eq('user_id', user.id);
+      .eq('user_id', userId);
 
     if (availabilityFilter === 'available') {
       query = query.is('output_video', null);
@@ -81,19 +92,34 @@ export function MyVideosClient({ initialAvailableCount, initialUnavailableCount 
       query = query.not('output_video', 'is', null);
     }
 
-    if (debouncedSearch.trim()) {
-      query = query.ilike('title', `%${debouncedSearch.trim()}%`);
+    const trimmedSearch = debouncedSearch.trim();
+    if (trimmedSearch) {
+      // Escape ILIKE special characters (%, _, \) so user input like "100%"
+      // is treated as a literal string, not a wildcard pattern.
+      query = query.ilike('title', `%${escapeIlike(trimmedSearch)}%`);
     }
 
-    const { data, error, count } = await query.order('created_at', { ascending: false }).range(from, to);
+    // Forward the React Query AbortSignal to Supabase so that when React Query
+    // cancels a stale request (e.g. on query key change), the in-flight HTTP
+    // request is also aborted, preventing wasted bandwidth.
+    const { data, error, count } = await query
+      .order('created_at', { ascending: false })
+      .range(from, to)
+      .abortSignal(signal);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      // AbortError = intentional cancellation by React Query; not a real error.
+      if (error.message?.includes('AbortError') || error.message?.includes('aborted')) {
+        throw new Error('AbortError');
+      }
+      throw new Error(error.message);
+    }
 
     const validJobs = (data as Job[]).filter(isValidJob);
 
     return {
       items: validJobs,
-      nextCursor: validJobs.length === ITEMS_PER_PAGE ? pageParam + 1 : null,
+      nextCursor: validJobs.length === ITEMS_PER_PAGE ? page + 1 : null,
       totalCount: count || 0,
     };
   };
