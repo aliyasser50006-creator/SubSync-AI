@@ -11,40 +11,40 @@
   :root {
     /* ── Surface & Canvas ── */
     --background: 0 0% 98%;
-    --foreground: 240 10% 6%;
+    --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 6%;
+    --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 6%;
+    --popover-foreground: 240 10% 3.9%;
 
     /* ── Brand Accent (Electric Indigo) ── */
     --primary: 238 86% 59%;
     --primary-foreground: 0 0% 100%;
 
     /* ── Neutral Surfaces ── */
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
-    --accent: 240 5% 96%;
-    --accent-foreground: 240 6% 10%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
 
     /* ── Semantic Colors ── */
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
     --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 32 90% 12%;
 
     /* ── Borders & Inputs ── */
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 238 86% 59%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 240 5.9% 10%;
 
     /* ── Elevated Surfaces ── */
-    --surface: 240 5% 96%;
-    --surface-foreground: 240 10% 6%;
+    --surface: 0 0% 100%;
+    --surface-foreground: 240 10% 3.9%;
 
     /* ── Charts ── */
     --chart-1: 238 86% 59%;
@@ -54,55 +54,55 @@
     --chart-5: 0 84% 60%;
 
     /* ── Geometry ── */
-    --radius: 0.625rem;
+    --radius: 0.5rem;
 
     /* ── Elevation System ── */
-    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
-    --shadow-soft: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.04);
-    --shadow-panel: 0 10px 30px -4px rgb(0 0 0 / 0.08), 0 4px 12px -2px rgb(0 0 0 / 0.04);
-    --shadow-elevated: 0 20px 50px -8px rgb(0 0 0 / 0.12), 0 8px 20px -4px rgb(0 0 0 / 0.06);
-    --shadow-glow: 0 0 0 1px hsl(238 86% 59% / 0.12), 0 0 20px -2px hsl(238 86% 59% / 0.15);
-    --shadow-glow-success: 0 0 0 1px hsl(160 84% 39% / 0.12), 0 0 20px -2px hsl(160 84% 39% / 0.15);
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-soft: 0 2px 8px -2px rgb(0 0 0 / 0.05), 0 1px 4px -1px rgb(0 0 0 / 0.03);
+    --shadow-md: 0 8px 24px -4px rgb(0 0 0 / 0.08), 0 4px 12px -2px rgb(0 0 0 / 0.04);
+    --shadow-panel: 0 12px 32px -4px rgb(0 0 0 / 0.1), 0 8px 16px -4px rgb(0 0 0 / 0.05);
+    --shadow-elevated: 0 24px 64px -8px rgb(0 0 0 / 0.12), 0 12px 24px -6px rgb(0 0 0 / 0.06);
+    --shadow-glow: 0 0 0 1px hsl(238 86% 59% / 0.15), 0 0 24px -2px hsl(238 86% 59% / 0.2);
+    --shadow-glow-success: 0 0 0 1px hsl(160 84% 39% / 0.15), 0 0 24px -2px hsl(160 84% 39% / 0.2);
   }
 
   .dark {
     /* ── Surface & Canvas ── */
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 6.5%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 6.5%;
-    --popover-foreground: 0 0% 98%;
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+    --card: 217 33% 17%;
+    --card-foreground: 210 40% 98%;
+    --popover: 217 33% 17%;
+    --popover-foreground: 210 40% 98%;
 
     /* ── Brand Accent ── */
     --primary: 238 86% 66%;
-    --primary-foreground: 240 10% 4%;
+    --primary-foreground: 222 47% 11%;
 
     /* ── Neutral Surfaces ── */
-    --secondary: 240 4% 14%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 4% 14%;
-    --muted-foreground: 240 5% 64%;
-    --accent: 240 4% 14%;
-    --accent-foreground: 0 0% 98%;
+    --secondary: 215 28% 27%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 215 28% 27%;
+    --accent-foreground: 210 40% 98%;
 
     /* ── Semantic Colors ── */
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
     --success: 160 84% 39%;
     --success-foreground: 164 100% 8%;
     --warning: 38 92% 56%;
     --warning-foreground: 35 100% 10%;
 
     /* ── Borders & Inputs ── */
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
-    --ring: 238 86% 66%;
+    --border: 215 28% 27%;
+    --input: 215 28% 27%;
+    --ring: 210 40% 98%;
 
     /* ── Elevated Surfaces ── */
-    --surface: 240 6% 10%;
-    --surface-foreground: 0 0% 98%;
+    --surface: 217 33% 17%;
+    --surface-foreground: 210 40% 98%;
 
     /* ── Charts ── */
     --chart-1: 238 86% 66%;
@@ -112,13 +112,13 @@
     --chart-5: 0 72% 62%;
 
     /* ── Elevation System (Dark) ── */
-    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.2);
-    --shadow-soft: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.2);
-    --shadow-md: 0 4px 8px -1px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.2);
-    --shadow-panel: 0 12px 40px -4px rgb(0 0 0 / 0.5), 0 4px 16px -2px rgb(0 0 0 / 0.3);
-    --shadow-elevated: 0 24px 60px -8px rgb(0 0 0 / 0.6), 0 8px 24px -4px rgb(0 0 0 / 0.4);
-    --shadow-glow: 0 0 0 1px hsl(238 86% 66% / 0.15), 0 0 24px -2px hsl(238 86% 66% / 0.12);
-    --shadow-glow-success: 0 0 0 1px hsl(160 84% 39% / 0.15), 0 0 24px -2px hsl(160 84% 39% / 0.12);
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+    --shadow-soft: 0 2px 8px -2px rgb(0 0 0 / 0.5), 0 1px 4px -1px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 8px 24px -4px rgb(0 0 0 / 0.6), 0 4px 12px -2px rgb(0 0 0 / 0.5);
+    --shadow-panel: 0 12px 32px -4px rgb(0 0 0 / 0.7), 0 8px 16px -4px rgb(0 0 0 / 0.6);
+    --shadow-elevated: 0 24px 64px -8px rgb(0 0 0 / 0.8), 0 12px 24px -6px rgb(0 0 0 / 0.7);
+    --shadow-glow: 0 0 0 1px hsl(238 86% 66% / 0.2), 0 0 24px -2px hsl(238 86% 66% / 0.25);
+    --shadow-glow-success: 0 0 0 1px hsl(160 84% 39% / 0.2), 0 0 24px -2px hsl(160 84% 39% / 0.25);
   }
 
   * {
@@ -189,7 +189,7 @@
 
   /* Elevated glass panel — used for login/register form cards */
   .glass-panel-elevated {
-    @apply rounded-2xl border border-border/60 bg-card/95 shadow-panel backdrop-blur-xl;
+    @apply rounded-xl border border-border/60 bg-card/95 shadow-panel backdrop-blur-xl;
     box-shadow:
       0 0 0 1px hsl(var(--primary) / 0.06),
       0 1px 0 0 rgba(255,255,255,0.05) inset,
@@ -238,8 +238,8 @@
 
   /* ── Gradient CTA Button ── */
   .btn-gradient {
-    @apply bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70
-           transition-all duration-200 shadow-sm hover:shadow-md hover:shadow-primary/20;
+    @apply bg-gradient-to-b from-primary to-primary/90 hover:from-primary/95 hover:to-primary/80
+           transition-all duration-200 shadow-sm hover:shadow-md;
   }
 
   /* ── Keyboard Shortcut Badge ── */
