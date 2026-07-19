@@ -96,7 +96,8 @@ export function MyVideosClient({ initialAvailableCount, initialUnavailableCount 
     if (trimmedSearch) {
       // Escape ILIKE special characters (%, _, \) so user input like "100%"
       // is treated as a literal string, not a wildcard pattern.
-      query = query.ilike('title', `%${escapeIlike(trimmedSearch)}%`);
+      const escaped = escapeIlike(trimmedSearch).replace(/"/g, '""');
+      query = query.or(`title.ilike."%${escaped}%",video_url.ilike."%${escaped}%"`);
     }
 
     // Forward the React Query AbortSignal to Supabase so that when React Query
