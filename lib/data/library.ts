@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { BrowseVideo } from '@/lib/types/video-browser';
 import { Job } from '@/lib/types/database';
+import { escapeIlike } from '@/lib/utils/escape-ilike';
 
 export const DEFAULT_LIBRARY_PAGE_SIZE = 12;
 export const LIBRARY_STATUSES = ['all', 'ready', 'processing', 'pending', 'failed'] as const;
@@ -76,7 +77,7 @@ export async function getLibraryPageData({
     .eq('user_id', userId);
 
   if (searchQuery) {
-    pageQuery = pageQuery.ilike('title', `%${searchQuery.replace(/[\\%_]/g, '\\$&')}%`);
+    pageQuery = pageQuery.ilike('title', `%${escapeIlike(searchQuery)}%`);
   }
 
   if (status === 'ready') {
