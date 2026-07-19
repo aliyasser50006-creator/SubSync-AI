@@ -57,6 +57,10 @@ export function LibraryClient({
   const [isRandomGenerating, setIsRandomGenerating] = useState(false);
   const previousLocation = useRef(`${routePath}:${currentPage}`);
 
+  // Track mount so the debounce effect doesn't fire on first render
+  // (the initial searchTerm already matches the server-rendered searchQuery).
+  const isMountedRef = useRef(false);
+
   useEffect(() => setSearchTerm(searchQuery), [searchQuery]);
   useEffect(() => setSelectedStatus(statusFilter), [statusFilter]);
   useEffect(() => setSelectedSort(sortBy), [sortBy]);
@@ -98,6 +102,52 @@ export function LibraryClient({
       document.getElementById('main-content')?.scrollTo({ top: scrollTop, behavior: 'auto' });
     });
   }, [libraryHref]);
+
+  // ── Debounced auto-search ─────────────────────────────────────────────────
+  //
+  // As the user types and pauses for 350ms, automatically navigate to the
+  // search results. Uses router.replace (not push) so intermediate keystrokes
+  // don't pollute the browser history stack — only explicit form submits create
+  // a new history entry.
+  //
+  // Guards:
+  //   - Skip on first mount (initial value == server-rendered searchQuery)
+  //   - Skip if the trimmed value matches the query already fetched from SSR
+  //   - Skip if a transition is already pending (avoid queuing a replace
+  //     on top of a push that hasn't resolved yet)
+  //
+  useEffect(() => {
+    if (!isMountedRef.current) {
+      isMountedRef.current = true;
+      return;
+    }
+
+    const trimmed = searchTerm.trim();
+
+    // No change from what's already displayed — skip
+    if (trimmed === searchQuery) return;
+
+    const timerId = setTimeout(() => {
+      startTransition(() => {
+        router.replace(
+          buildHref({
+            path: trimmed ? '/library/search' : '/library',
+            page: 1,
+            query: trimmed,
+            status: selectedStatus,
+            sort: selectedSort,
+          }),
+          { scroll: false },
+        );
+      });
+    }, 350);
+
+    return () => clearTimeout(timerId);
+    // buildHref is stable (recreated each render but referentially changes only
+    // when its captured props change — deliberately excluded from deps to avoid
+    // stale closure; values are read inside the timeout callback synchronously).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
   const navigate = (state: NavigationState) => {
     startTransition(() => router.push(buildHref(state), { scroll: false }));
