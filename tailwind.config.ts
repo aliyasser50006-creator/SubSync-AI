@@ -24,21 +24,25 @@ const config: Config = {
         'gradient-conic':
           'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
         'grid-pattern':
-          'linear-gradient(to right, hsl(var(--border) / 0.3) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px)',
+          'linear-gradient(to right, hsl(var(--border) / 0.25) 1px, transparent 1px), linear-gradient(to bottom, hsl(var(--border) / 0.25) 1px, transparent 1px)',
       },
       backgroundSize: {
-        grid: '40px 40px',
+        grid: '48px 48px',
       },
       boxShadow: {
         xs: 'var(--shadow-xs)',
         soft: 'var(--shadow-soft)',
         md: 'var(--shadow-md)',
+        lg: 'var(--shadow-lg)',
         panel: 'var(--shadow-panel)',
         elevated: 'var(--shadow-elevated)',
         glow: 'var(--shadow-glow)',
         'glow-success': 'var(--shadow-glow-success)',
+        'glow-violet': 'var(--shadow-glow-violet)',
       },
       opacity: {
+        '8': '0.08',
+        '12': '0.12',
         '15': '0.15',
         '35': '0.35',
         '45': '0.45',
@@ -52,6 +56,7 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
         xl: 'calc(var(--radius) + 4px)',
         '2xl': 'calc(var(--radius) + 8px)',
+        '3xl': '1.25rem',
       },
       colors: {
         background: hslVar('--background'),
@@ -84,7 +89,11 @@ const config: Config = {
           DEFAULT: hslVar('--destructive'),
           foreground: hslVar('--destructive-foreground'),
         },
-        border: hslVar('--border'),
+        border: {
+          DEFAULT: hslVar('--border'),
+          subtle: hslVar('--border-subtle'),
+          strong: hslVar('--border-strong'),
+        },
         input: hslVar('--input'),
         ring: hslVar('--ring'),
         chart: {
@@ -102,14 +111,25 @@ const config: Config = {
           DEFAULT: hslVar('--warning'),
           foreground: hslVar('--warning-foreground'),
         },
+        info: {
+          DEFAULT: hslVar('--info'),
+          foreground: hslVar('--info-foreground'),
+        },
         surface: {
           DEFAULT: hslVar('--surface'),
           foreground: hslVar('--surface-foreground'),
+          hover: hslVar('--surface-hover'),
+          active: hslVar('--surface-active'),
+        },
+        brand: {
+          violet: hslVar('--brand-violet'),
+          cyan: hslVar('--brand-cyan'),
         },
       },
       transitionTimingFunction: {
         'spring': 'cubic-bezier(0.16, 1, 0.3, 1)',
         'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
+        'bounce': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
       },
       keyframes: {
         'accordion-down': {
@@ -149,6 +169,27 @@ const config: Config = {
           '0%, 100%': { boxShadow: '0 0 0 0 hsl(var(--primary) / 0.3)' },
           '50%': { boxShadow: '0 0 0 8px hsl(var(--primary) / 0)' },
         },
+        'float': {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-8px)' },
+        },
+        'gradient-shift': {
+          '0%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+          '100%': { backgroundPosition: '0% 50%' },
+        },
+        'blur-in': {
+          from: { opacity: '0', filter: 'blur(8px)' },
+          to: { opacity: '1', filter: 'blur(0)' },
+        },
+        'bounce-subtle': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-4px)' },
+        },
+        'marquee': {
+          from: { transform: 'translateX(0)' },
+          to: { transform: 'translateX(-50%)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -160,6 +201,11 @@ const config: Config = {
         'scale-in': 'scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both',
         'shimmer': 'shimmer 2s ease-in-out infinite',
         'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+        'float': 'float 6s ease-in-out infinite',
+        'gradient-shift': 'gradient-shift 8s ease infinite',
+        'blur-in': 'blur-in 0.4s ease-out both',
+        'bounce-subtle': 'bounce-subtle 2s ease-in-out infinite',
+        'marquee': 'marquee 30s linear infinite',
       },
     },
   },
