@@ -153,6 +153,7 @@ export default function VideoPlayer({
   const cuesRef = useRef<SubtitleCue[]>([]);
   const activeCueIdRef = useRef<number | null>(null);
   const activeCueIndexRef = useRef(-1);
+  const previousActiveCueIndexRef = useRef(-2);
   const subtitlesEnabledRef = useRef(true);
   const subtitleDelaySecondsRef = useRef(subtitleDelaySeconds);
 
@@ -229,6 +230,11 @@ export default function VideoPlayer({
       setActiveCue(cue);
     } else {
       activeCueIndexRef.current = index;
+    }
+
+    if (previousActiveCueIndexRef.current !== activeCueIndexRef.current) {
+      previousActiveCueIndexRef.current = activeCueIndexRef.current;
+      window.dispatchEvent(new CustomEvent('subsync:activecue', { detail: { index: activeCueIndexRef.current } }));
     }
   }, []);
 
@@ -349,11 +355,13 @@ export default function VideoPlayer({
 
   useEffect(() => {
     const handleCustomSeek = (e: Event) => {
-      const customEvent = e as CustomEvent<{ seconds: number }>;
+      const customEvent = e as CustomEvent<{ seconds: number; play?: boolean }>;
       if (customEvent.detail && typeof customEvent.detail.seconds === 'number') {
         seekToTime(customEvent.detail.seconds);
         setCurrentTimeSafely(customEvent.detail.seconds, true);
-        setPlaying(true);
+        if (customEvent.detail.play !== false) {
+          setPlaying(true);
+        }
       }
     };
     window.addEventListener('subsync:seek', handleCustomSeek);
