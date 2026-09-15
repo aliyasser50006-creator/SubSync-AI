@@ -575,8 +575,13 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
             break;
           case 'a':
             if (document.activeElement?.closest('[data-cue-list]')) {
-              e.preventDefault();
-              editorRef.current.selectAllCues();
+              const activeEl = document.activeElement as HTMLElement | null;
+              const tagName = activeEl?.tagName.toLowerCase();
+              const isEditable = activeEl?.isContentEditable;
+              if (tagName !== 'input' && tagName !== 'textarea' && !isEditable) {
+                e.preventDefault();
+                editorRef.current.selectAllCues();
+              }
             }
             break;
         }
