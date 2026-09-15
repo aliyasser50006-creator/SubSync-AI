@@ -4,14 +4,24 @@ import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { getSubtitleById } from '@/lib/actions/subtitles';
+import { getSubtitleById, saveSubtitleContent } from '@/lib/actions/subtitles';
 import { getJobById } from '@/lib/actions/jobs';
-import { parseSubtitleContent } from '@/lib/utils/subtitle-converter';
+import { parseSubtitleContent, readSubtitleFileAsText } from '@/lib/utils/subtitle-converter';
 import { Subtitle, EditableCue, Job } from '@/lib/types/database';
 import { useEditorState } from './use-editor-state';
 import { useAutoSave, SaveStatus } from './use-auto-save';
 import { useSubtitleValidation, ValidationIssue } from './use-subtitle-validation';
 import { getHealthRating } from './validation-constants';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   ArrowLeft,
   Save,
@@ -39,7 +49,9 @@ import {
   Video,
   Maximize2,
   Minimize2,
-  Loader2
+  Loader2,
+  Upload,
+  Crosshair,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,6 +88,18 @@ function formatTime(seconds: number): string {
   const s = Math.floor(seconds % 60);
   const ms = Math.round((seconds - Math.floor(seconds)) * 1000);
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
+}
+
+function cuesToVtt(cues: EditableCue[]): string {
+  if (cues.length === 0) return 'WEBVTT\n\n';
+  const vttLines = ['WEBVTT', ''];
+  const sorted = [...cues].sort((a, b) => a.start - b.start);
+  sorted.forEach((cue) => {
+    vttLines.push(`${formatTime(cue.start)} --> ${formatTime(cue.end)}`);
+    vttLines.push(cue.text);
+    vttLines.push('');
+  });
+  return vttLines.join('\n');
 }
 
 function parseTime(str: string): number | null {
@@ -142,6 +166,8 @@ const MemoizedCueItem = memo(({
   handleDrop,
   setDragOverIndex,
   setShowValidation,
+  isActivePlaying,
+  handleInteraction,
 }: any) => {
   const hasError = issues.some((i: any) => i.severity === 'error');
   const hasWarning = !hasError && issues.some((i: any) => i.severity === 'warning');
@@ -154,8 +180,9 @@ const MemoizedCueItem = memo(({
         hasError && 'border-destructive/40 shadow-[0_0_12px_rgba(239,68,68,0.1)]',
         hasWarning && 'border-warning/40 shadow-[0_0_12px_rgba(245,158,11,0.1)]',
         isSelected && 'ring-2 ring-primary/60 bg-primary/5',
-        focusedCueId === cue.id && 'ring-2 ring-primary bg-primary/5',
+        focusedCueId === cue.id && !isActivePlaying && 'ring-2 ring-primary bg-primary/5',
         isHighlight && 'bg-primary/10',
+        isActivePlaying && 'ring-2 ring-blue-500/80 bg-blue-500/10 shadow-[0_0_12px_rgba(59,130,246,0.15)]',
         isDragTarget && 'border-primary border-dashed bg-primary/5 opacity-50',
         'content-visibility-auto'
       )}
@@ -173,9 +200,23 @@ const MemoizedCueItem = memo(({
         <Badge variant="outline" className="px-1.5 py-0 text-[10px] h-5 bg-background/50 font-mono text-muted-foreground border-border/50 shrink-0">
           #{cue.index}
         </Badge>
+        <button
+          type="button"
+          onClick={() => {
+            const event = new CustomEvent('subsync:seek', { detail: { seconds: cue.start, play: false } });
+            window.dispatchEvent(event);
+          }}
+          className="text-muted-foreground/40 hover:text-primary transition-colors focus:outline-none p-1 -ml-1 rounded-md"
+          title="Jump to video time"
+        >
+          <Crosshair className="h-3.5 w-3.5" />
+        </button>
         <Checkbox
           checked={isSelected}
-          onCheckedChange={() => toggleCueSelection(cue.id)}
+          onCheckedChange={() => {
+            if (handleInteraction) handleInteraction();
+            toggleCueSelection(cue.id);
+          }}
           className="h-4 w-4 rounded-[4px]"
         />
         <div className="ml-auto opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
@@ -186,30 +227,30 @@ const MemoizedCueItem = memo(({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 shadow-lg backdrop-blur-xl bg-card/95">
-              <DropdownMenuItem onClick={() => splitCue(cue.id, Math.floor(cue.text.length / 2))}>
+              <DropdownMenuItem onClick={() => { if (handleInteraction) handleInteraction(); splitCue(cue.id, Math.floor(cue.text.length / 2)); }}>
                 <Scissors className="mr-2 h-4 w-4" />
                 Split Halfway
               </DropdownMenuItem>
               {nextCueId && (
-                <DropdownMenuItem onClick={() => mergeCues(cue.id, nextCueId)}>
+                <DropdownMenuItem onClick={() => { if (handleInteraction) handleInteraction(); mergeCues(cue.id, nextCueId); }}>
                   <Merge className="mr-2 h-4 w-4" />
                   Merge with Next
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={() => duplicateCue(cue.id)}>
+              <DropdownMenuItem onClick={() => { if (handleInteraction) handleInteraction(); duplicateCue(cue.id); }}>
                 <Copy className="mr-2 h-4 w-4" />
                 Duplicate
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => reorderCue(cue.id, 'up')}>
+              <DropdownMenuItem onClick={() => { if (handleInteraction) handleInteraction(); reorderCue(cue.id, 'up'); }}>
                 <ChevronUp className="mr-2 h-4 w-4" />
                 Move Up
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => reorderCue(cue.id, 'down')}>
+              <DropdownMenuItem onClick={() => { if (handleInteraction) handleInteraction(); reorderCue(cue.id, 'down'); }}>
                 <ChevronDown className="mr-2 h-4 w-4" />
                 Move Down
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onClick={() => deleteCue(cue.id)}>
+              <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive" onClick={() => { if (handleInteraction) handleInteraction(); deleteCue(cue.id); }}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete Cue
               </DropdownMenuItem>
@@ -227,6 +268,7 @@ const MemoizedCueItem = memo(({
               className="time-input w-24 bg-transparent px-1 py-0.5 text-xs font-mono font-medium focus:outline-none placeholder:text-muted-foreground/50"
               value={formatTime(cue.start)}
               onChange={(e) => {
+                if (handleInteraction) handleInteraction();
                 const t = parseTime(e.target.value);
                 if (t !== null) updateCueTime(cue.id, 'start', t);
               }}
@@ -242,6 +284,7 @@ const MemoizedCueItem = memo(({
               className="time-input w-24 bg-transparent px-1 py-0.5 text-xs font-mono font-medium focus:outline-none placeholder:text-muted-foreground/50"
               value={formatTime(cue.end)}
               onChange={(e) => {
+                if (handleInteraction) handleInteraction();
                 const t = parseTime(e.target.value);
                 if (t !== null) updateCueTime(cue.id, 'end', t);
               }}
@@ -253,7 +296,10 @@ const MemoizedCueItem = memo(({
 
         <Textarea
           value={cue.text}
-          onChange={(e) => updateCueText(cue.id, e.target.value)}
+          onChange={(e) => {
+            if (handleInteraction) handleInteraction();
+            updateCueText(cue.id, e.target.value);
+          }}
           onBlur={handleBlur}
           className="min-h-[52px] resize-none text-[13px] leading-relaxed bg-background/30 border-transparent shadow-none focus-visible:bg-background/80 focus-visible:ring-1 focus-visible:border-primary transition-colors py-2 px-2.5"
           placeholder="Enter subtitle text..."
@@ -307,8 +353,16 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
   const [showTools, setShowTools] = useState(false);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [focusedCueId, setFocusedCueId] = useState<string | null>(null);
+  const [activePlayingCueId, setActivePlayingCueId] = useState<string | null>(null);
+  const lastInteractionTime = useRef<number>(0);
+  const isAutoScrollingRef = useRef<boolean>(false);
   const [duplicating, setDuplicating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Replace subtitle file state
+  const [replaceDialogOpen, setReplaceDialogOpen] = useState(false);
+  const [pendingReplaceFile, setPendingReplaceFile] = useState<{ content: string; cues: EditableCue[]; fileName: string } | null>(null);
+  const [replacing, setReplacing] = useState(false);
+  const replaceFileInputRef = useRef<HTMLInputElement>(null);
   const cueListRef = useRef<HTMLDivElement>(null);
   const subtitleBlobUrlRef = useRef<string | null>(null);
   const [subtitlePreviewUrl, setSubtitlePreviewUrl] = useState<string | null>(null);
@@ -332,8 +386,10 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
 
   // Load subtitle data
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       const { data, error } = await getSubtitleById(subtitleId);
+      if (cancelled) return;
       if (error || !data) {
         toast.error('Subtitle not found');
         router.push('/library/subtitles');
@@ -349,7 +405,27 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
         end: cue.end,
         text: cue.text,
       }));
+      if (cancelled) return;
       editor.setCues(editableCues);
+
+      // Generate initial subtitle preview blob so it displays immediately
+      let url: string | null = null;
+      if (editableCues.length > 0) {
+        const vttContent = cuesToVtt(editableCues);
+        const blob = new Blob([vttContent], { type: 'text/vtt' });
+        url = URL.createObjectURL(blob);
+      }
+      
+      if (cancelled) {
+        if (url) URL.revokeObjectURL(url);
+        return;
+      }
+
+      if (subtitleBlobUrlRef.current) {
+        URL.revokeObjectURL(subtitleBlobUrlRef.current);
+      }
+      subtitleBlobUrlRef.current = url;
+      setSubtitlePreviewUrl(url);
 
       // Find job linked to this subtitle path
       if (data.path) {
@@ -359,6 +435,7 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
           .select('*')
           .eq('subtitle_file', data.path)
           .single();
+        if (cancelled) return;
         if (jobData) {
           let videoUrl = jobData.video_url;
           if (videoUrl) {
@@ -375,7 +452,9 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
               const {
                 data: { user: currentUser },
               } = await supabase.auth.getUser();
+              if (cancelled) return;
               const { data: signedData } = await supabase.storage.from('videos').createSignedUrl(videoPath, 3600);
+              if (cancelled) return;
               if (signedData?.signedUrl) {
                 videoUrl = signedData.signedUrl;
               }
@@ -388,6 +467,9 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
       setLoading(false);
     };
     load();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subtitleId]);
 
@@ -407,7 +489,7 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
       return;
     }
 
-    const vttContent = editorRef.current.serialize('vtt');
+    const vttContent = cuesToVtt(editorRef.current.cues);
     const blob = new Blob([vttContent], { type: 'text/vtt' });
     const url = URL.createObjectURL(blob);
 
@@ -417,8 +499,12 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
     subtitleBlobUrlRef.current = url;
     setSubtitlePreviewUrl(url);
   }, []);
+  const handleInteraction = useCallback(() => {
+    lastInteractionTime.current = Date.now();
+  }, []);
 
   const handleBlur = useCallback(() => {
+    lastInteractionTime.current = Date.now();
     autoSaveRef.current.triggerBlurSave();
     validationRef.current.triggerValidation();
     updatePreviewBlob();
@@ -432,6 +518,33 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
         subtitleBlobUrlRef.current = null;
       }
     };
+  }, []);
+
+  // Listen for active cue updates from VideoPlayer
+  useEffect(() => {
+    const handleActiveCue = (e: Event) => {
+      const customEvent = e as CustomEvent<{ index: number }>;
+      const { index } = customEvent.detail;
+      
+      const newActiveCueId = index >= 0 && index < editorRef.current.cues.length 
+        ? editorRef.current.cues[index].id 
+        : null;
+
+      setActivePlayingCueId(newActiveCueId);
+
+      if (newActiveCueId && Date.now() - lastInteractionTime.current > 3000) {
+        const el = document.getElementById(`cue-block-${newActiveCueId}`);
+        if (el) {
+          isAutoScrollingRef.current = true;
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => {
+            isAutoScrollingRef.current = false;
+          }, 500);
+        }
+      }
+    };
+    window.addEventListener('subsync:activecue', handleActiveCue);
+    return () => window.removeEventListener('subsync:activecue', handleActiveCue);
   }, []);
 
   // Keyboard shortcuts
@@ -480,7 +593,7 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
 
   const handleDownload = useCallback(
     (format: 'srt' | 'vtt') => {
-      const content = editor.serialize(format);
+      const content = format === 'vtt' ? cuesToVtt(editor.cues) : editor.serialize('srt');
       const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -533,6 +646,7 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
   }, [searchQuery, editor.cues]);
 
   const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
+    lastInteractionTime.current = Date.now();
     e.dataTransfer.setData('text/plain', index.toString());
     e.dataTransfer.effectAllowed = 'move';
   }, []);
@@ -545,6 +659,7 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
 
   const handleDrop = useCallback(
     (e: React.DragEvent, toIndex: number) => {
+      lastInteractionTime.current = Date.now();
       e.preventDefault();
       const fromIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
       if (!isNaN(fromIndex) && fromIndex !== toIndex) {
@@ -554,6 +669,84 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
     },
     [editor]
   );
+
+  // ── Replace Subtitle File ────────────────────────────────────────────────
+  const handleReplaceFileSelected = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      // Reset input so the same file can be re-selected later
+      if (replaceFileInputRef.current) replaceFileInputRef.current.value = '';
+      if (!file) return;
+
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (ext !== 'srt' && ext !== 'vtt') {
+        toast.error('Invalid file type. Please upload a .srt or .vtt file.');
+        return;
+      }
+
+      let content: string;
+      try {
+        content = await readSubtitleFileAsText(file);
+      } catch {
+        toast.error('Could not read the file. It may be corrupted or unreadable.');
+        return;
+      }
+
+      let parsedCues: ReturnType<typeof parseSubtitleContent>;
+      try {
+        parsedCues = parseSubtitleContent(content);
+      } catch {
+        toast.error('Failed to parse the subtitle file. Please check the format.');
+        return;
+      }
+
+      if (parsedCues.length === 0) {
+        toast.error('The uploaded file contains no valid subtitle cues. Upload cancelled.');
+        return;
+      }
+
+      const editableCues: EditableCue[] = parsedCues.map((cue, i) => ({
+        id: crypto.randomUUID(),
+        index: i + 1,
+        start: cue.start,
+        end: cue.end,
+        text: cue.text,
+      }));
+
+      setPendingReplaceFile({ content, cues: editableCues, fileName: file.name });
+      setReplaceDialogOpen(true);
+    },
+    []
+  );
+
+  const handleConfirmReplace = useCallback(async () => {
+    if (!pendingReplaceFile || !subtitle) return;
+    setReplacing(true);
+    try {
+      const { error } = await saveSubtitleContent(subtitleId, pendingReplaceFile.content);
+      if (error) {
+        toast.error(`Failed to save replaced subtitle: ${error}`);
+        return;
+      }
+      // Reset editor state with new cues (clears undo/redo history and dirty flag)
+      editor.setCues(pendingReplaceFile.cues);
+      // Trigger a fresh preview blob
+      updatePreviewBlob();
+      toast.success(`Subtitle replaced successfully from "${pendingReplaceFile.fileName}".`);
+    } catch {
+      toast.error('An unexpected error occurred while replacing the subtitle.');
+    } finally {
+      setReplacing(false);
+      setPendingReplaceFile(null);
+      setReplaceDialogOpen(false);
+    }
+  }, [pendingReplaceFile, subtitle, subtitleId, editor, updatePreviewBlob]);
+
+  const handleCancelReplace = useCallback(() => {
+    setPendingReplaceFile(null);
+    setReplaceDialogOpen(false);
+  }, []);
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Normalize timestamps tool
   const normalizeTimestamps = useCallback(() => {
@@ -594,6 +787,7 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
   }
 
   return (
+    <>
     <div className="flex h-[calc(100vh-4rem)] flex-col lg:h-screen">
       {/* Toolbar */}
       <div className="flex items-center gap-2 border-b border-border/60 bg-card/80 px-3 py-2 backdrop-blur-sm flex-wrap">
@@ -669,6 +863,29 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
           <Button variant="outline" size="sm" onClick={() => autoSave.manualSave()} className="hidden sm:flex">
             <Save className="mr-1.5 h-3.5 w-3.5" />
             Save
+          </Button>
+
+          {/* Divider */}
+          <div className="h-5 w-px bg-border/60 hidden sm:block" />
+
+          {/* Replace subtitle file – intentionally separated from auto-save controls */}
+          <input
+            ref={replaceFileInputRef}
+            type="file"
+            accept=".srt,.vtt"
+            className="sr-only"
+            aria-label="Replace subtitle file"
+            onChange={handleReplaceFileSelected}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="hidden sm:flex border-dashed text-muted-foreground hover:text-foreground"
+            onClick={() => replaceFileInputRef.current?.click()}
+            title="Upload a new .srt or .vtt file to replace the current subtitle"
+          >
+            <Upload className="mr-1.5 h-3.5 w-3.5" />
+            Replace File
           </Button>
 
           <DropdownMenu>
@@ -1047,7 +1264,12 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
           <div
             ref={cueListRef}
             data-cue-list
-            className="flex-1 overflow-y-auto"
+            className="flex-1 overflow-y-auto overflow-x-hidden p-2 min-h-0 relative scroll-smooth cue-list-container"
+            onScroll={() => {
+              if (!isAutoScrollingRef.current) {
+                lastInteractionTime.current = Date.now();
+              }
+            }}
           >
             {editor.cues.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center px-4">
@@ -1091,6 +1313,8 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
                       handleDrop={handleDrop}
                       setDragOverIndex={setDragOverIndex}
                       setShowValidation={setShowValidation}
+                      isActivePlaying={activePlayingCueId === cue.id}
+                      handleInteraction={handleInteraction}
                     />
                   );
                 })}
@@ -1129,5 +1353,49 @@ export function SubtitleEditorPage({ subtitleId }: SubtitleEditorPageProps) {
         </div>
       </div>
     </div>
+
+    {/* ── Replace Subtitle Confirmation Dialog ─────────────────────────────── */}
+    <AlertDialog open={replaceDialogOpen} onOpenChange={(open) => { if (!open) handleCancelReplace(); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5 text-primary" />
+            Replace Subtitle Content?
+          </AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2 text-sm">
+              <p>
+                You are about to replace the current subtitle with the file{' '}
+                <span className="font-semibold text-foreground">
+                  &ldquo;{pendingReplaceFile?.fileName}&rdquo;
+                </span>{' '}
+                ({pendingReplaceFile?.cues.length ?? 0} cue{(pendingReplaceFile?.cues.length ?? 0) !== 1 ? 's' : ''} detected).
+              </p>
+              <p className="text-warning font-medium">
+                ⚠ This will permanently overwrite the existing subtitle content and clear all unsaved edits and undo/redo history. This action cannot be undone.
+              </p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={handleCancelReplace} disabled={replacing}>
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirmReplace}
+            disabled={replacing}
+            className="bg-primary hover:bg-primary/90"
+          >
+            {replacing ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Replacing...</>
+            ) : (
+              <><Upload className="mr-2 h-4 w-4" /> Yes, Replace
+              </>
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
