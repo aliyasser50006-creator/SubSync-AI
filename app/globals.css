@@ -570,6 +570,8 @@
   outline: none;
   aspect-ratio: 16 / 9;
   box-shadow: var(--shadow-soft);
+  /* Disables browser double-tap zoom and the 300ms synthetic-click delay on touch. */
+  touch-action: manipulation;
 }
 
 .video-player-container:focus-visible {
@@ -581,6 +583,17 @@
   height: 100%;
   object-fit: contain;
   display: block;
+  position: relative; /* needed so the gesture-layer child can be positioned absolutely */
+}
+
+/* Transparent overlay above the react-player iframe so touch/click events
+   reach the parent container for YouTube & Vimeo sources (cross-origin iframes
+   swallow all pointer input). z-index 1 keeps it above the iframe but below
+   all overlays (z-index 20+) and the controls bar (z-index 40). */
+.video-player-gesture-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
 }
 
 .video-player-poster {
@@ -951,6 +964,67 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   Double-Tap-to-Seek — Feedback Overlay (additive only)
+   ════════════════════════════════════════════════════ */
+
+.video-player-dts-feedback {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 30; /* above subtitles (z-index: 10–20), below controls (z-index: 40) */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px 20px;
+  border-radius: 14px;
+  background: rgba(2, 6, 23, 0.62);
+  backdrop-filter: blur(10px);
+  pointer-events: none; /* never intercept any input */
+  user-select: none;
+  animation: dts-feedback-fade 0.7s ease forwards;
+}
+
+.video-player-dts-feedback--left {
+  left: 10%;
+}
+
+.video-player-dts-feedback--right {
+  right: 10%;
+}
+
+.video-player-dts-icon {
+  font-size: 22px;
+  color: #ffffff;
+  line-height: 1;
+  letter-spacing: -2px;
+}
+
+.video-player-dts-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: hsl(var(--primary));
+  letter-spacing: 0.03em;
+}
+
+@keyframes dts-feedback-fade {
+  0%   { opacity: 0; transform: translateY(calc(-50% - 4px)); }
+  15%  { opacity: 1; transform: translateY(-50%); }
+  70%  { opacity: 1; transform: translateY(-50%); }
+  100% { opacity: 0; transform: translateY(-50%); }
+}
+
+/* For users who prefer reduced motion, skip the animation entirely so the
+   label is visible immediately. The JS timer still removes the overlay after 700ms. */
+@media (prefers-reduced-motion: reduce) {
+  .video-player-dts-feedback {
+    animation: none !important;
+    opacity: 1;
   }
 }
 
