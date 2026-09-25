@@ -6,7 +6,9 @@ export interface ParsedSubtitleCue {
   cueIndex?: number;
 }
 
-const TIMECODE_PATTERN = /^((?:\d{1,2}:)?\d{2}:\d{2}[.,]\d{1,3})\s*-->\s*((?:\d{1,2}:)?\d{2}:\d{2}[.,]\d{1,3})(?:\s+.*)?$/;
+// Millisecond fraction ([.,]\d{1,3}) is optional so that whole-second timestamps
+// like "00:02:15 --> 00:02:18" are accepted and defaulted to .000 rather than dropped.
+const TIMECODE_PATTERN = /^((?:\d{1,2}:)?\d{2}:\d{2}(?:[.,]\d{1,3})?)\s*-->\s*((?:\d{1,2}:)?\d{2}:\d{2}(?:[.,]\d{1,3})?)(?:\s+.*)?$/;
 const ENCODING_CANDIDATES = ['utf-8', 'windows-1256', 'windows-1252', 'iso-8859-1', 'utf-16le'];
 
 export function normalizeSubtitleText(input: string): string {
@@ -129,14 +131,24 @@ function parseTimestamp(value: string): number | null {
   return hours * 3600 + minutes * 60 + seconds;
 }
 
+// Returns parsed start/end for any line that structurally looks like a timecode arrow
+// pair. Leading/trailing whitespace is trimmed before matching so indented lines are
+// not silently dropped. We deliberately do NOT reject cues where end <= start here —
+// those are passed through to the editor's INVALID_TIMESTAMP validation rule which
+// already knows how to flag and auto-fix them.
 function parseTimecodeLine(line: string): { start: number; end: number } | null {
-  const match = line.match(TIMECODE_PATTERN);
+  // Trim both ends so a timecode line with leading spaces/tabs still matches the
+  // ^-anchored regex (fix: was only trimEnd()'d upstream).
+  const match = line.trim().match(TIMECODE_PATTERN);
   if (!match) return null;
 
   const start = parseTimestamp(match[1]);
   const end = parseTimestamp(match[2]);
 
-  if (start === null || end === null || end <= start) {
+  // Only bail out if the timestamp strings are structurally unparseable (null).
+  // A cue with end <= start is still a recognisable cue — let the editor's
+  // INVALID_TIMESTAMP rule catch it rather than silently discarding it.
+  if (start === null || end === null) {
     return null;
   }
 
@@ -203,22 +215,33 @@ export function parseSubtitleContent(content: string): ParsedSubtitleCue[] {
     const textLines: string[] = [];
     while (cursor < lines.length) {
       const textLine = lines[cursor].replace(/\s+$/g, '');
+
+      // Stop at a blank line (standard SRT cue separator).
       if (textLine.trim() === '') break;
+
+      // Safety boundary: if this line itself is a timecode arrow line, we've
+      // reached the start of the next cue without a separating blank line.
+      // Break without consuming the line so the outer loop can parse it as a
+      // new cue, preventing the next cue's index/timecode/text from being
+      // swallowed into the current cue's text.
+      if (parseTimecodeLine(textLine) !== null) break;
 
       textLines.push(textLine);
       cursor += 1;
     }
 
+    // Always push the cue — even when the text is empty or whitespace-only.
+    // The editor's EMPTY_TEXT validation rule is already designed to flag and
+    // auto-fix blank cues; discarding them here means they silently vanish
+    // instead of surfacing in the validation panel.
     const text = textLines.join('\n').trim();
-    if (text) {
-      cues.push({
-        id: cueId++,
-        start: timecode.start,
-        end: timecode.end,
-        text,
-        cueIndex,
-      });
-    }
+    cues.push({
+      id: cueId++,
+      start: timecode.start,
+      end: timecode.end,
+      text,
+      cueIndex,
+    });
 
     while (cursor < lines.length && lines[cursor].trim() === '') {
       cursor += 1;
