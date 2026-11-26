@@ -104,6 +104,7 @@ export function VideoPlaybackCard({
               <VideoPlayer
                 key={`my-videos-player-${selectedJob.id}-${selectedJob.video_url}`}
                 src={playerUrl}
+                proxySrc={`/api/video-proxy?jobId=${encodeURIComponent(selectedJob.id)}`}
                 posterUrl={selectedJob.img_url}
                 playRequestId={playRequestId}
                 subtitleUrl={selectedSubtitleUrl}
