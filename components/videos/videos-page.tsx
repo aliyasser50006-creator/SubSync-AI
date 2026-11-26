@@ -593,6 +593,7 @@ export function VideosPage() {
                   <VideoPlayer
                     key={`videos-page-player-${selectedVideo.id}-${selectedVideo.video_url}`}
                     src={selectedVideo.video_url}
+                    proxySrc={`/api/video-proxy?jobId=${encodeURIComponent(selectedVideo.id)}`}
                     posterUrl={selectedVideo.img_url}
                     playRequestId={playRequestId}
                     subtitleUrl={subtitlesEnabled ? selectedSubtitleUrl : null}
