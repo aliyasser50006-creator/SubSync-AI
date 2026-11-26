@@ -21,6 +21,7 @@ import { SubtitleSettings } from '@/lib/types/database';
 
 interface VideoPlayerProps {
   src: string;
+  proxySrc?: string | null;
   posterUrl?: string | null;
   subtitleUrl?: string | null;
   subtitleSettings?: SubtitleSettings;
@@ -50,6 +51,79 @@ const DOUBLE_TAP_SEEK_SECONDS = 5;  // seconds to seek per double-tap
 const LONG_PRESS_MS    = 500;       // ms hold duration that suppresses the tap gesture
 
 type ReactPlayerComponent = React.ComponentType<any>;
+
+const EMBED_OR_ADAPTIVE_PATTERNS = [
+  /(?:youtu\.be\/|youtube(?:-nocookie|education)?\.com\/(?:embed\/|v\/|watch\/|watch\?v=|watch\?.+&v=|shorts\/|live\/))((\w|-){11})|youtube\.com\/playlist\?list=|youtube\.com\/user\//i,
+  /vimeo\.com\/(?!progressive_redirect).+/i,
+  /(?:wistia\.(?:com|net)|wi\.st)\/(?:medias|embed)\/(?:iframe\/)?([^?]+)/i,
+  /open\.spotify\.com\/(\w+)\/(\w+)/i,
+  /(?:www\.|go\.)?twitch\.tv\/([a-zA-Z0-9_]+|(videos?\/|\?video=)\d+)($|\?)/i,
+  /tiktok\.com\/(?:player\/v1\/|share\/video\/|@[^/]+\/video\/)([0-9]+)/i,
+  /stream\.mux\.com\/(?!\w+\.m3u8)(\w+)/i,
+  /\.(m3u8|mpd)(#[^?]*)?($|\?)/i,
+];
+
+function isEmbedOrAdaptiveSource(url: string): boolean {
+  return EMBED_OR_ADAPTIVE_PATTERNS.some((pattern) => pattern.test(url));
+}
+
+function sanitizeUrlForLog(url: string): string {
+  if (!url) return '[empty]';
+  if (url.startsWith('/')) return url.split('?')[0];
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return '[invalid-url]';
+  }
+}
+
+function describeMediaError(video: HTMLVideoElement): {
+  code: number;
+  message: string;
+  canFallbackToProxy: boolean;
+} {
+  const code = video.error?.code ?? 0;
+
+  switch (code) {
+    case 1: // MEDIA_ERR_ABORTED
+      return {
+        code,
+        message: 'Video loading was aborted before playback could finish.',
+        canFallbackToProxy: false,
+      };
+    case 2: // MEDIA_ERR_NETWORK
+      return {
+        code,
+        message: 'Network error while streaming the video. The server interrupted the connection or range request.',
+        canFallbackToProxy: true,
+      };
+    case 3: // MEDIA_ERR_DECODE
+      return {
+        code,
+        message: 'Browser failed to decode this video stream. Its video or audio codec profile may not be supported.',
+        canFallbackToProxy: false,
+      };
+    case 4: { // MEDIA_ERR_SRC_NOT_SUPPORTED
+      const supportsHevc =
+        video.canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"') !== '' ||
+        video.canPlayType('video/mp4; codecs="hev1.1.6.L93.B0"') !== '';
+      return {
+        code,
+        message: supportsHevc
+          ? 'Video source failed to load (blocked cross-origin request, invalid token, or unsupported media format).'
+          : 'Video source failed to load or uses an unsupported codec (e.g. H.265/HEVC is not supported by this browser).',
+        canFallbackToProxy: true,
+      };
+    }
+    default:
+      return {
+        code,
+        message: 'Failed to load this video. Please verify the URL and try again.',
+        canFallbackToProxy: true,
+      };
+  }
+}
 
 function formatTime(seconds: number): string {
   if (Number.isNaN(seconds) || !Number.isFinite(seconds)) return '0:00';
@@ -138,6 +212,7 @@ function findActiveCue(
 
 export default function VideoPlayer({
   src,
+  proxySrc = null,
   posterUrl = null,
   subtitleUrl = null,
   subtitleSettings = {},
@@ -147,6 +222,7 @@ export default function VideoPlayer({
 }: VideoPlayerProps) {
   const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
   const playerRef = useRef<any>(null);
+  const nativeVideoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const readyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -182,6 +258,7 @@ export default function VideoPlayer({
 
   const [playerKey, setPlayerKey] = useState(0);
   const [ReactPlayer, setReactPlayer] = useState<ReactPlayerComponent | null>(null);
+  const [useProxyFallback, setUseProxyFallback] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
@@ -205,11 +282,30 @@ export default function VideoPlayer({
   } | null>(null);
 
   const normalizedSrc = useMemo(() => (typeof src === 'string' ? src.trim() : ''), [src]);
+  const normalizedProxySrc = useMemo(() => (typeof proxySrc === 'string' ? proxySrc.trim() : ''), [proxySrc]);
   const hasSource = normalizedSrc.length > 0;
+  const isDirectNativeVideo = useMemo(
+    () => hasSource && !isEmbedOrAdaptiveSource(normalizedSrc),
+    [hasSource, normalizedSrc]
+  );
+  const activeSrc = useMemo(
+    () => (useProxyFallback && normalizedProxySrc ? normalizedProxySrc : normalizedSrc),
+    [useProxyFallback, normalizedProxySrc, normalizedSrc]
+  );
+  const canFallbackToProxy = isDirectNativeVideo && normalizedProxySrc.length > 0 && !useProxyFallback;
+
+  const setNativeVideoNode = useCallback((node: HTMLVideoElement | null) => {
+    nativeVideoRef.current = node;
+    playerRef.current = node;
+  }, []);
 
   const { cues, error: subtitleError, loading: subtitleLoading } = useSubtitleParser(subtitleUrl);
 
   useEffect(() => {
+    if (!hasSource || isDirectNativeVideo || ReactPlayer) {
+      return;
+    }
+
     let cancelled = false;
 
     import('react-player')
@@ -227,7 +323,7 @@ export default function VideoPlayer({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hasSource, isDirectNativeVideo, ReactPlayer]);
 
   const resetControlsTimeout = useCallback(() => {
     setShowControls(true);
@@ -431,6 +527,7 @@ export default function VideoPlayer({
 
   useEffect(() => {
     setVideoError(null);
+    setUseProxyFallback(false);
     setReady(false);
     setPlaying(false);
     setHasStartedPlaying(false);
@@ -464,11 +561,22 @@ export default function VideoPlayer({
       readyTimeoutRef.current = null;
     }
 
-    if (!hasSource || !ReactPlayer || videoError || ready) {
+    if (!hasSource || (!isDirectNativeVideo && !ReactPlayer) || videoError || ready) {
       return;
     }
 
     readyTimeoutRef.current = setTimeout(() => {
+      if (canFallbackToProxy) {
+        console.warn('[VideoPlayer] Direct video load timed out; retrying via same-origin proxy', {
+          source: sanitizeUrlForLog(normalizedSrc),
+        });
+        setUseProxyFallback(true);
+        setBuffering(true);
+        setVideoError(null);
+        setPlayerKey((prev) => prev + 1);
+        return;
+      }
+
       setBuffering(false);
       setVideoError('Video is taking too long to load. Please verify the URL and try again.');
     }, 15000);
@@ -479,7 +587,62 @@ export default function VideoPlayer({
         readyTimeoutRef.current = null;
       }
     };
-  }, [hasSource, ReactPlayer, ready, videoError, playerKey]);
+  }, [hasSource, isDirectNativeVideo, ReactPlayer, ready, videoError, playerKey, canFallbackToProxy, normalizedSrc]);
+
+  useEffect(() => {
+    const video = nativeVideoRef.current;
+    if (!isDirectNativeVideo || !video || videoError) return;
+
+    if (playing) {
+      if (video.paused) {
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err: unknown) => {
+            if (err instanceof DOMException && err.name === 'AbortError') return;
+            if (err instanceof DOMException && err.name === 'NotAllowedError') {
+              setPlaying(false);
+            }
+          });
+        }
+      }
+    } else if (!video.paused) {
+      video.pause();
+    }
+  }, [isDirectNativeVideo, playing, videoError, activeSrc, playerKey, ready]);
+
+  useEffect(() => {
+    const video = nativeVideoRef.current;
+    if (!isDirectNativeVideo || !video) return;
+
+    video.volume = volume;
+    video.muted = muted;
+  }, [isDirectNativeVideo, volume, muted, activeSrc, playerKey]);
+
+  const handleNativeVideoError = useCallback((event: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = event.currentTarget;
+    const { code, message, canFallbackToProxy: shouldRetryViaProxy } = describeMediaError(video);
+
+    console.warn('[VideoPlayer] MediaError while loading video', {
+      source: sanitizeUrlForLog(activeSrc),
+      viaProxy: useProxyFallback,
+      code,
+      networkState: video.networkState,
+      readyState: video.readyState,
+    });
+
+    if (shouldRetryViaProxy && canFallbackToProxy) {
+      setUseProxyFallback(true);
+      setReady(false);
+      setBuffering(true);
+      setVideoError(null);
+      setPlayerKey((prev) => prev + 1);
+      return;
+    }
+
+    setVideoError(message);
+    setBuffering(false);
+    setReady(false);
+  }, [activeSrc, useProxyFallback, canFallbackToProxy]);
 
   const prevPlayRequestIdRef = useRef(playRequestId);
 
@@ -511,6 +674,15 @@ export default function VideoPlayer({
     if (typeof player.setPlaybackRate === 'function') {
       try {
         player.setPlaybackRate(nextRate);
+        return;
+      } catch {
+        // ignore provider-specific failures
+      }
+    }
+
+    if ('playbackRate' in player) {
+      try {
+        player.playbackRate = nextRate;
         return;
       } catch {
         // ignore provider-specific failures
@@ -590,6 +762,7 @@ export default function VideoPlayer({
 
   const handleRetry = useCallback(() => {
     setVideoError(null);
+    setUseProxyFallback(false);
     setReady(false);
     setBuffering(false);
     setPlaying(false);
@@ -853,7 +1026,78 @@ export default function VideoPlayer({
       {/* onClick toggles play for mouse users. Touch clicks are suppressed by
           e.preventDefault() in handleContainerTouchEnd so this never fires on touch. */}
       <div className="video-player-video" onClick={togglePlay}>
-        {!videoError && hasSource && ReactPlayer && (
+        {!videoError && hasSource && isDirectNativeVideo && (
+          <video
+            key={`${activeSrc}-${playerKey}`}
+            ref={setNativeVideoNode}
+            src={activeSrc}
+            playsInline
+            preload="metadata"
+            controls={false}
+            controlsList="nodownload"
+            className="w-full h-full object-contain block"
+            onLoadStart={() => {
+              setVideoError(null);
+            }}
+            onLoadedMetadata={(event) => {
+              const video = event.currentTarget;
+              if (Number.isFinite(video.duration) && video.duration > 0) {
+                setDurationSafely(video.duration);
+              }
+              setReady(true);
+              setBuffering(false);
+              setVideoError(null);
+            }}
+            onCanPlay={(event) => {
+              const video = event.currentTarget;
+              if (Number.isFinite(video.duration) && video.duration > 0) {
+                setDurationSafely(video.duration);
+              }
+              setReady(true);
+              setBuffering(false);
+            }}
+            onDurationChange={(event) => {
+              const nextDuration = event.currentTarget.duration;
+              if (Number.isFinite(nextDuration) && nextDuration > 0) {
+                setDurationSafely(nextDuration);
+              }
+            }}
+            onTimeUpdate={(event) => {
+              setCurrentTimeSafely(event.currentTarget.currentTime);
+            }}
+            onSeeking={() => {
+              if (ready) {
+                setBuffering(true);
+              }
+            }}
+            onSeeked={(event) => {
+              setBuffering(false);
+              setCurrentTimeSafely(event.currentTarget.currentTime, true);
+            }}
+            onPlay={() => {
+              setPlaying(true);
+              setBuffering(false);
+              setHasStartedPlaying(true);
+            }}
+            onPlaying={() => {
+              setBuffering(false);
+              setHasStartedPlaying(true);
+            }}
+            onPause={() => setPlaying(false)}
+            onWaiting={() => {
+              if (ready) {
+                setBuffering(true);
+              }
+            }}
+            onStalled={() => {
+              if (ready && playingRef.current) {
+                setBuffering(true);
+              }
+            }}
+            onError={handleNativeVideoError}
+          />
+        )}
+        {!videoError && hasSource && !isDirectNativeVideo && ReactPlayer && (
           <ReactPlayer
             key={`${normalizedSrc}-${playerKey}`}
             ref={playerRef}
@@ -914,6 +1158,9 @@ export default function VideoPlayer({
               }
             }}
             onError={() => {
+              console.warn('[VideoPlayer] Embedded player error', {
+                source: sanitizeUrlForLog(normalizedSrc),
+              });
               setVideoError('Failed to load this video. Please verify the URL and try again.');
               setBuffering(false);
               setReady(false);
@@ -930,12 +1177,6 @@ export default function VideoPlayer({
               vimeo: {
                 controls: false,
                 autoplay: false,
-              },
-              file: {
-                attributes: {
-                  controlsList: 'nodownload',
-                  autoPlay: false,
-                },
               },
             } as any}
           />
