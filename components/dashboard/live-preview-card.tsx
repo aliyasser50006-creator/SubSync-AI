@@ -100,6 +100,7 @@ export function LivePreviewCard({
                 <div className="rounded-xl overflow-hidden shadow-panel border border-border/40">
                   <VideoPlayer
                     src={currentJob.video_url}
+                    proxySrc={`/api/video-proxy?jobId=${encodeURIComponent(currentJob.id)}`}
                     posterUrl={currentJob.img_url}
                     subtitleUrl={subtitlePlaybackUrl}
                     subtitleSettings={settings}
