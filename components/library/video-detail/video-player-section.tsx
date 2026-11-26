@@ -84,6 +84,7 @@ export function VideoPlayerSection({
         <VideoPlayer
           key={`video-detail-${videoId}`}
           src={videoUrl}
+          proxySrc={`/api/video-proxy?jobId=${encodeURIComponent(videoId)}`}
           posterUrl={posterUrl}
           playRequestId={playRequestId}
           subtitleUrl={subtitlesEnabled ? subtitleUrl : null}
